@@ -251,6 +251,29 @@ dados %>%
     theme_minimal()
 ```
 
+```{r}
+# Carrega os pacotes necessários
+library(ggplot2)
+library(dplyr)
+
+# Gera o gráfico das 10 áreas com menor número de bolsas (excluindo "Não informado")
+dados %>%
+  filter(area_conhecimento != "Não informado") %>%
+  count(area_conhecimento, sort = TRUE) %>%
+  slice_min(n, n = 10) %>%
+  ggplot(aes(x = reorder(area_conhecimento, n), y = n)) +
+    geom_col(fill = "darkred") +
+    coord_flip() +
+    labs(
+      x = "Área de Conhecimento",
+      y = "Número de Bolsas",
+      title = "Top 10 Áreas com Menor Número de Bolsas"
+    ) +
+    theme_minimal(base_size = 12)
+
+```
+
+
 ```{r top-ufs, fig.cap="Top 10 UFs de Origem com maior número de bolsistas."}
 dados %>%
   filter(!is.na(sigla_uf_origem)) %>%
@@ -428,6 +451,11 @@ dados %>%
 Este gráfico de dispersão com uma linha de regressão auxilia a entender se existe uma correlação entre o valor financeiro da bolsa e a sua duração em dias.
 
 ```{r}
+library(dplyr)
+library(ggplot2)
+library(scales)
+
+# Cálculo da duração
 dados_com_duracao <- dados %>%
   mutate(
     data_inicio_processo = as.Date(data_inicio_processo),
@@ -436,17 +464,33 @@ dados_com_duracao <- dados %>%
   ) %>%
   filter(!is.na(duracao_dias), duracao_dias > 0)
 
+# Cálculo dos limites para detectar outliers
+q1_valor <- quantile(dados_com_duracao$valor, 0.25, na.rm = TRUE)
+q3_valor <- quantile(dados_com_duracao$valor, 0.75, na.rm = TRUE)
+iqr_valor <- q3_valor - q1_valor
+lim_sup_valor <- q3_valor + 1.5 * iqr_valor
+
+# Marca os outliers
+dados_com_duracao <- dados_com_duracao %>%
+  mutate(outlier_valor = valor > lim_sup_valor)
+
+# Gráfico melhorado com destaque para outliers
 ggplot(dados_com_duracao, aes(x = duracao_dias, y = valor)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", color = "red", se = FALSE) +
-  scale_x_log10(labels = scales::comma) +
-  scale_y_log10(labels = scales::dollar_format(prefix = "R$ ")) +
+  geom_point(aes(color = outlier_valor), alpha = 0.3, size = 0.7) +
+  scale_color_manual(values = c("FALSE" = "black", "TRUE" = "red"), labels = c("Normal", "Outlier")) +
+  geom_smooth(method = "lm", color = "blue", se = FALSE, linewidth = 1) +
+  scale_x_log10(labels = comma_format()) +
+  scale_y_log10(labels = dollar_format(prefix = "R$ ")) +
   labs(
     title = "Relação entre Valor da Bolsa e Duração do Processo",
+    subtitle = "Pontos vermelhos indicam valores considerados outliers",
     x = "Duração do Processo (dias, escala log)",
-    y = "Valor da Bolsa (R$, escala log)"
+    y = "Valor da Bolsa (R$, escala log)",
+    color = "Tipo de Valor"
   ) +
-  theme_minimal()
+  theme_light(base_size = 12) +
+  theme(legend.position = "bottom")
+
 ```
 
 
